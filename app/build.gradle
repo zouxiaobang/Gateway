@@ -1,0 +1,49 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion "29.0.3"
+
+    defaultConfig {
+        applicationId "com.firstlinecode.gateway"
+        minSdkVersion 23
+        targetSdkVersion 29
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+
+
+    // chalk xmpp libraries
+    implementation 'com.firstlinecode.chalk:com.firstlinecode.chalk.android:0.2.0.RELEASE'
+    // sand xmpp protocol of core
+    implementation 'com.firstlinecode.sand.protocols:com.firstlinecode.sand.protocols.core:0.1.0.RELEASE'
+    // sand xmpp protocol of ibdr
+    implementation 'com.firstlinecode.sand.protocols:com.firstlinecode.sand.protocols.ibdr:0.1.0.RELEASE'
+    // sand client of ibdr
+    implementation 'com.firstlinecode.sand.client:com.firstlinecode.sand.client.ibdr:0.1.0.RELEASE'
+    // sand client of lora
+    implementation 'com.firstlinecode.sand.client:com.firstlinecode.sand.client.lora:0.1.0.RELEASE'
+
+    //gson
+    implementation 'com.google.code.gson:gson:2.8.6'
+}

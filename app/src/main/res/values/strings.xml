@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Gateway</string>
+
+    <string name="stream_config_host">stream-config-host</string>
+    <string name="stream_config_default_host">192.168.2.138</string>
+    <string name="stream_config_port">stream-config-port</string>
+    <string name="stream_config_default_port">6222</string>
+    <string name="stream_config_enable_tls">stream-config-enable-tls</string>
+    <string name="stream_config_default_enable_tls">true</string>
+    <string name="log_config_show">log-config-show</string>
+    <string name="log_config_default_show">true</string>
+    <string name="log_config_tag">log-config-tag</string>
+    <string name="log_config_default_tag">Gateway</string>
+    <string name="gateway_config_device_id">gateway-config-device-id</string>
+    <string name="gateway_config_device_identity">gateway-config-device-identity</string>
+</resources>
