@@ -21,6 +21,9 @@ android {
         }
     }
 
+    packagingOptions {
+        merge 'META-INF/bxmpp-extension.properties'
+    }
 }
 
 dependencies {
@@ -43,6 +46,8 @@ dependencies {
     implementation 'com.firstlinecode.sand.client:com.firstlinecode.sand.client.ibdr:0.1.0.RELEASE'
     // sand client of lora
     implementation 'com.firstlinecode.sand.client:com.firstlinecode.sand.client.lora:0.1.0.RELEASE'
+    // sand emulators of lora network
+    implementation 'com.firstlinecode.sand.emulators.network:com.firstlinecode.sand.emulators.network.lora:0.1.0.RELEASE'
 
     //gson
     implementation 'com.google.code.gson:gson:2.8.6'

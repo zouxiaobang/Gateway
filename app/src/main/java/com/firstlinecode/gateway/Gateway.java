@@ -1,5 +1,7 @@
 package com.firstlinecode.gateway;
 
+import android.annotation.SuppressLint;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -9,35 +11,47 @@ import com.firstlinecode.chalk.core.stream.UsernamePasswordToken;
 import com.firstlinecode.chalk.network.ConnectionException;
 import com.firstlinecode.gateway.utils.SpUtil;
 import com.firstlinecode.sand.client.ibdr.IRegistration;
+import com.firstlinecode.sand.client.ibdr.IbdrError;
 import com.firstlinecode.sand.client.ibdr.IbdrPlugin;
 import com.firstlinecode.sand.client.ibdr.RegistrationException;
+import com.firstlinecode.sand.client.lora.DynamicAddressConfigurator;
+import com.firstlinecode.sand.client.lora.IDualLoraChipsCommunicator;
+import com.firstlinecode.sand.client.things.concentrator.IConcentrator;
+import com.firstlinecode.sand.emulators.lora.DualLoraChipsCommunicator;
+import com.firstlinecode.sand.emulators.lora.ILoraNetwork;
+import com.firstlinecode.sand.emulators.lora.LoraChip;
+import com.firstlinecode.sand.emulators.lora.LoraChipCreationParams;
+import com.firstlinecode.sand.emulators.lora.LoraNetwork;
 import com.firstlinecode.sand.protocols.core.DeviceIdentity;
+import com.firstlinecode.sand.protocols.lora.DualLoraAddress;
+import com.firstlinecode.sand.protocols.lora.LoraAddress;
 import com.google.gson.Gson;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class Gateway {
+public class Gateway implements DynamicAddressConfigurator.Listener {
     private DeviceIdentity deviceIdentity;
+
     private boolean isReconnect;
     private boolean interceptReconnect;
 
+    private DynamicAddressConfigurator addressConfigurator;
+    private IConcentrator concentrator;
+    private IDualLoraChipsCommunicator gatewayCommunicator;
+
     public Gateway() {
+        ILoraNetwork network = new LoraNetwork();
+        gatewayCommunicator = DualLoraChipsCommunicator.createInstance(
+                network, DualLoraAddress.randomDualLoraAddress(0), new LoraChipCreationParams(
+                        LoraChip.Type.HIGH_POWER));
+
         reconnect();
     }
 
-    void register() {
+    DeviceIdentity register() {
         if (Toolkits.showLog(App.getAppContext())) {
             Log.d(Toolkits.logTag(App.getAppContext()), "==== gateway client register start ====");
-        }
-
-        String deviceIdFromCache = Toolkits.getDeviceId(App.getAppContext());
-        String deviceIdentityFromCache = Toolkits.getDeviceIdentity(App.getAppContext());
-        if (!TextUtils.isEmpty(deviceIdFromCache) && !TextUtils.isEmpty(deviceIdentityFromCache)) {
-            if (Toolkits.showLog(App.getAppContext())) {
-                Log.d(Toolkits.logTag(App.getAppContext()), "the gateway[" + deviceIdFromCache + "] is registered!");
-            }
-            return;
         }
 
         String deviceId = getDeviceId();
@@ -52,8 +66,7 @@ public class Gateway {
                         + ", " + deviceIdentity.getCredentials() + "]");
             }
 
-            // 注册成功，保存deviceId和deviceIdentity
-            SpUtil.putString(App.getAppContext(), App.getAppContext().getString(R.string.gateway_config_device_id), deviceId);
+            // 注册成功，保存deviceIdentity
             SpUtil.putString(App.getAppContext(), App.getAppContext().getString(R.string.gateway_config_device_identity), new Gson().toJson(deviceIdentity));
         }
 
@@ -61,12 +74,17 @@ public class Gateway {
         if (Toolkits.showLog(App.getAppContext())) {
             Log.d(Toolkits.logTag(App.getAppContext()), "==== gateway client register end ====");
         }
+
+        return deviceIdentity;
     }
 
+    @SuppressLint("HardwareIds")
     private String getDeviceId() {
-        // TODO 使用Build.SERIAL生成唯一码
-//        return "GE01" + ThingTool.generateRandomDeviceId(8);
-        return "GE01" + "12345678";
+        // 使用Build.SERIAL生成唯一码
+        String serialNum = Build.SERIAL;
+        int length = serialNum.length();
+
+        return "GE01" + serialNum.substring(length - 8, length);
     }
 
     private DeviceIdentity doRegister(String deviceId) {
@@ -85,8 +103,21 @@ public class Gateway {
             return registration.register(deviceId);
         } catch (RegistrationException ex) {
             if (Toolkits.showLog(App.getAppContext())) {
+                if (IbdrError.CONNECTION_ERROR.equals(ex.getError())) {
+                    // 连接异常
+                    Log.d(Toolkits.logTag(App.getAppContext()), "设备连接异常！");
+                } else if (IbdrError.NOT_AUTHORIZED.equals(ex.getError())) {
+                    // 未认证
+                    Log.d(Toolkits.logTag(App.getAppContext()), "设备未进行认证！");
+                } else if (IbdrError.CONFLICT.equals(ex.getError())) {
+                    // 该网关已注册
+                    deviceIdentity = getDeviceIdentityFromCache();
+                    return deviceIdentity;
+                }
+
                 Log.d(Toolkits.logTag(App.getAppContext()), "设备[" + deviceId + "]无法注册，原因为：" + ex.getMessage());
             }
+
             return null;
         } finally {
             registration.removeConnectionListener(connectListener);
@@ -99,9 +130,13 @@ public class Gateway {
             Log.d(Toolkits.logTag(App.getAppContext()), "==== gateway client connect start ====");
         }
 
+        deviceIdentity = getDeviceIdentityFromCache();
         if (deviceIdentity == null) {
-            String deviceIdentityJson = Toolkits.getDeviceIdentity(App.getAppContext());
-            deviceIdentity = new Gson().fromJson(deviceIdentityJson, DeviceIdentity.class);
+            if (Toolkits.showLog(App.getAppContext())) {
+                Log.d(Toolkits.logTag(App.getAppContext()), "==== gateway client connect fail: deviceIdentity is null ====");
+            }
+
+            return;
         }
 
         doConnect();
@@ -109,6 +144,16 @@ public class Gateway {
         if (Toolkits.showLog(App.getAppContext())) {
             Log.d(Toolkits.logTag(App.getAppContext()), "==== gateway client connect end ====");
         }
+    }
+
+    private DeviceIdentity getDeviceIdentityFromCache() {
+        String deviceIdentityJson = Toolkits.getDeviceIdentity(App.getAppContext());
+        DeviceIdentity deviceIdentity = new Gson().fromJson(deviceIdentityJson, DeviceIdentity.class);
+        if (!deviceIdentity.getDeviceName().equals(getDeviceId())) {
+            return null;
+        }
+
+        return deviceIdentity;
     }
 
     private void doConnect() {
@@ -132,6 +177,9 @@ public class Gateway {
                 Log.d(Toolkits.logTag(App.getAppContext()), "网关连接成功");
             }
 
+            concentrator = createConcentrator();
+            addressConfigurator = new DynamicAddressConfigurator(gatewayCommunicator, concentrator);
+            addressConfigurator.addListener(this);
         } catch (ConnectionException e) {
             if (Toolkits.showLog(App.getAppContext())) {
                 Log.d(Toolkits.logTag(App.getAppContext()), "网关连接异常：" + e.getMessage());
@@ -162,6 +210,10 @@ public class Gateway {
         }
     }
 
+    private IConcentrator createConcentrator() {
+        return null;
+    }
+
     private void reconnect() {
         // TODO 使用线程池工具替换Executors
         ExecutorService threadPool = Executors.newCachedThreadPool();
@@ -186,5 +238,34 @@ public class Gateway {
                 }
             }
         });
+    }
+
+    synchronized void setToWorkingMode() {
+        addressConfigurator.stop();
+        startWorking(ChatClientSingleton.get());
+    }
+
+    private void startWorking(IChatClient iChatClient) {
+
+    }
+
+    synchronized void setToAddressConfigurationMode() {
+        addressConfigurator.start();
+        stopWorking(ChatClientSingleton.get());
+    }
+
+    private void stopWorking(IChatClient iChatClient) {
+
+    }
+
+    /**
+     * 动态地址分配成功后回调
+     *
+     * @param deviceId 设备id
+     * @param address  lora地址
+     */
+    @Override
+    public void addressConfigured(String deviceId, LoraAddress address) {
+
     }
 }

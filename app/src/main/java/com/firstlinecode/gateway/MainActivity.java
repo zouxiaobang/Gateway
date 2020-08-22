@@ -4,6 +4,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
 
+import com.firstlinecode.sand.protocols.core.DeviceIdentity;
+
 public class MainActivity extends AppCompatActivity {
     private Gateway gateway;
 
@@ -23,7 +25,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void register() {
-        gateway.register();
-        gateway.connect();
+        DeviceIdentity deviceIdentity = gateway.register();
+        if (deviceIdentity != null) {
+            gateway.connect();
+        }
     }
 }

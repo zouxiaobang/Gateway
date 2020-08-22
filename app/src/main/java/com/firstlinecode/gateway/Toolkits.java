@@ -31,11 +31,6 @@ public class Toolkits {
         return streamConfig;
     }
 
-    static String getDeviceId(Context context) {
-        return SpUtil.getString(context, context.getString(R.string.gateway_config_device_id),
-                "");
-    }
-
     static String getDeviceIdentity(Context context) {
         return SpUtil.getString(context, context.getString(R.string.gateway_config_device_identity),
                 "");
